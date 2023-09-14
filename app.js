@@ -1,31 +1,65 @@
 const express = require('express');
-const app = express();
-const port = 3000;
+const fs = require('fs');
+const methodOverride = require('method-override');
+const ejs = require('ejs');
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.set('view engine', 'ejs');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.set('view engine', 'ejs');
+app.use(methodOverride('_method'));
 
-const tasks = [];
+// Helper functions
+function readTasks() {
+  try {
+    const data = fs.readFileSync('tasks.json', 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
 
+function writeTasks(tasks) {
+  fs.writeFileSync('tasks.json', JSON.stringify(tasks, null, 2), 'utf8');
+}
+
+// Routes
 app.get('/', (req, res) => {
-  res.render('index', { tasks });
+  res.redirect('/tasks');
 });
 
-app.post('/add', (req, res) => {
-  const { task } = req.body;
-  tasks.push(task);
-  res.redirect('/');
+app.get('/tasks', (req, res) => {
+  const tasks = readTasks();
+  res.render('tasks', { tasks });
 });
 
-app.post('/delete', (req, res) => {
-    const { taskIndex } = req.body;
-    if (taskIndex !== undefined && taskIndex >= 0 && taskIndex < tasks.length) {
-      tasks.splice(taskIndex, 1);
-    }
-    res.redirect('/');
-  });
-  
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+app.get('/add', (req, res) => {
+  res.render('add-task');
+});
+
+app.post('/tasks', (req, res) => {
+  const newTask = {
+    id: Date.now().toString(), // Simple ID based on timestamp
+    title: req.body.title,
+  };
+  const tasks = readTasks();
+  tasks.push(newTask);
+  writeTasks(tasks);
+  res.redirect('/tasks');
+});
+
+app.delete('/tasks/:id', (req, res) => {
+  const taskIdToDelete = req.params.id;
+  const tasks = readTasks();
+  const updatedTasks = tasks.filter(task => task.id !== taskIdToDelete);
+  writeTasks(updatedTasks);
+  res.redirect('/tasks');
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
